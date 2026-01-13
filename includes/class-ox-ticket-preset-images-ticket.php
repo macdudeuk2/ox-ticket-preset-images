@@ -142,14 +142,25 @@ class OX_Ticket_Preset_Images_Ticket {
 		// Check if we have a preset image ID in the raw data.
 		$image_id = 0;
 
-		// Check our custom hidden field.
+		// Check our custom field directly in raw_data.
 		if ( ! empty( $raw_data['ox_preset_image_id'] ) ) {
 			$image_id = absint( $raw_data['ox_preset_image_id'] );
 		}
 
-		// Also check tribe-ticket array (fallback).
+		// Check in tribe-ticket array (fallback).
 		if ( ! $image_id && ! empty( $raw_data['tribe-ticket']['ox_preset_image_id'] ) ) {
 			$image_id = absint( $raw_data['tribe-ticket']['ox_preset_image_id'] );
+		}
+
+		// Check in $_POST directly as last resort (AJAX might put it there).
+		if ( ! $image_id && ! empty( $_POST['ox_preset_image_id'] ) ) {
+			$image_id = absint( $_POST['ox_preset_image_id'] );
+		}
+
+		// Debug logging (can be removed after testing).
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'OX Preset Images - raw_data keys: ' . implode( ', ', array_keys( $raw_data ) ) );
+			error_log( 'OX Preset Images - image_id found: ' . $image_id );
 		}
 
 		// If no image ID found, nothing to do.
@@ -159,6 +170,9 @@ class OX_Ticket_Preset_Images_Ticket {
 
 		// Verify the attachment exists.
 		if ( ! wp_attachment_is_image( $image_id ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'OX Preset Images - attachment ' . $image_id . ' is not a valid image' );
+			}
 			return;
 		}
 
@@ -170,7 +184,11 @@ class OX_Ticket_Preset_Images_Ticket {
 		}
 
 		// Set the featured image on the WooCommerce product.
-		$this->set_product_image( $ticket_id, $image_id );
+		$result = $this->set_product_image( $ticket_id, $image_id );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'OX Preset Images - set image ' . $image_id . ' on product ' . $ticket_id . ': ' . ( $result ? 'success' : 'failed' ) );
+		}
 	}
 
 	/**

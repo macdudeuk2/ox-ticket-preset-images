@@ -17,6 +17,11 @@
 		presetImages: {},
 
 		/**
+		 * Currently pending image ID to apply.
+		 */
+		pendingImageId: 0,
+
+		/**
 		 * Initialize.
 		 */
 		init: function() {
@@ -33,25 +38,7 @@
 
 			this.presetImages = oxPresetImages.presets || {};
 			this.bindEvents();
-			this.ensureHiddenField();
-		},
-
-		/**
-		 * Ensure the hidden field exists in the ticket form.
-		 */
-		ensureHiddenField: function() {
-			var $ticketForm = $( '#ticket_form' );
-			
-			if ( ! $ticketForm.length ) {
-				return;
-			}
-
-			// Add hidden field if it doesn't exist.
-			if ( ! $ticketForm.find( '#ox-preset-image-id' ).length ) {
-				$ticketForm.append(
-					'<input type="hidden" id="ox-preset-image-id" name="ox_preset_image_id" value="" />'
-				);
-			}
+			this.interceptAjax();
 		},
 
 		/**
@@ -60,55 +47,88 @@
 		bindEvents: function() {
 			var self = this;
 
-			// Hook into TEC's preset selector change.
-			$( document ).on( 'change', '#ticket-preset', function() {
-				self.onPresetChange( $( this ).val() );
-			} );
-
-			// Hook into TEC's preset application buttons.
+			// Hook into TEC's preset application buttons - set pending image BEFORE TEC processes.
 			$( document ).on( 'click', '.tec-tickets-plus-presets__button-add, .tec-tickets-plus-presets__button-review', function() {
 				var presetId = $( '#ticket-preset' ).val();
 				if ( presetId ) {
-					self.setImageField( presetId );
+					self.pendingImageId = self.presetImages[ presetId ] || 0;
 				}
 			} );
 
-			// Clear the field when ticket form is cancelled or reset.
+			// Clear pending when ticket form is cancelled or reset.
 			$( document ).on( 'click', '#tribe_settings_form_cancel', function() {
-				self.clearImageField();
+				self.pendingImageId = 0;
 			} );
 
 			// Clear when switching to RSVP or other non-preset flows.
 			$( document ).on( 'tribe_ticket_panel_cancel', function() {
-				self.clearImageField();
+				self.pendingImageId = 0;
 			} );
 		},
 
 		/**
-		 * Handle preset selector change.
-		 *
-		 * @param {string} presetId The selected preset ID.
+		 * Intercept AJAX requests to inject our image ID into ticket save requests.
 		 */
-		onPresetChange: function( presetId ) {
-			// We don't set the field on change, only when actually applying.
-			// This prevents issues if user selects but doesn't apply.
+		interceptAjax: function() {
+			var self = this;
+
+			// Use jQuery's ajaxPrefilter to intercept all AJAX requests.
+			$.ajaxPrefilter( function( options, originalOptions, jqXHR ) {
+				// Check if this is a ticket save request.
+				if ( ! self.isTicketSaveRequest( options, originalOptions ) ) {
+					return;
+				}
+
+				// If we have a pending image, add it to the request data.
+				if ( self.pendingImageId ) {
+					self.injectImageId( options, originalOptions );
+				}
+			} );
 		},
 
 		/**
-		 * Set the hidden image field value.
+		 * Check if this AJAX request is a ticket save.
 		 *
-		 * @param {string|number} presetId The preset ID.
+		 * @param {Object} options         The processed AJAX options.
+		 * @param {Object} originalOptions The original AJAX options.
+		 * @return {boolean} True if this is a ticket save request.
 		 */
-		setImageField: function( presetId ) {
-			var imageId = this.presetImages[ presetId ] || 0;
-			$( '#ox-preset-image-id' ).val( imageId );
+		isTicketSaveRequest: function( options, originalOptions ) {
+			var data = originalOptions.data || options.data || '';
+
+			// Check for ticket save action in data.
+			if ( typeof data === 'string' ) {
+				return data.indexOf( 'tribe_ticket_add' ) !== -1 ||
+				       data.indexOf( 'action=ticket' ) !== -1;
+			}
+
+			if ( typeof data === 'object' ) {
+				return data.action === 'tribe_ticket_add' ||
+				       ( data.data && data.data.action === 'tribe_ticket_add' );
+			}
+
+			return false;
 		},
 
 		/**
-		 * Clear the hidden image field.
+		 * Inject our image ID into the AJAX request data.
+		 *
+		 * @param {Object} options         The processed AJAX options.
+		 * @param {Object} originalOptions The original AJAX options.
 		 */
-		clearImageField: function() {
-			$( '#ox-preset-image-id' ).val( '' );
+		injectImageId: function( options, originalOptions ) {
+			var imageId = this.pendingImageId;
+
+			if ( typeof options.data === 'string' ) {
+				// Data is URL-encoded string.
+				options.data += '&ox_preset_image_id=' + encodeURIComponent( imageId );
+			} else if ( typeof options.data === 'object' ) {
+				// Data is object.
+				options.data.ox_preset_image_id = imageId;
+			}
+
+			// Clear pending after injection.
+			this.pendingImageId = 0;
 		}
 	};
 
