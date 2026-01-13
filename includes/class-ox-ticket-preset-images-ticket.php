@@ -139,32 +139,34 @@ class OX_Ticket_Preset_Images_Ticket {
 			return;
 		}
 
-		// Check if we have a preset image ID in the raw data.
 		$image_id = 0;
 
-		// Check our custom field directly in raw_data.
-		if ( ! empty( $raw_data['ox_preset_image_id'] ) ) {
+		// PRIMARY METHOD: Get image from the preset ID (most reliable).
+		// TEC passes 'ticket_preset' in raw_data when a preset is used.
+		if ( ! empty( $raw_data['ticket_preset'] ) ) {
+			$preset_id = absint( $raw_data['ticket_preset'] );
+			$image_id  = OX_Ticket_Preset_Images::get_preset_image( $preset_id );
+
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'OX Preset Images - preset_id: ' . $preset_id . ', image from preset: ' . $image_id );
+			}
+		}
+
+		// FALLBACK: Check our custom field directly in raw_data (for JS injection method).
+		if ( ! $image_id && ! empty( $raw_data['ox_preset_image_id'] ) ) {
 			$image_id = absint( $raw_data['ox_preset_image_id'] );
 		}
 
-		// Check in tribe-ticket array (fallback).
-		if ( ! $image_id && ! empty( $raw_data['tribe-ticket']['ox_preset_image_id'] ) ) {
-			$image_id = absint( $raw_data['tribe-ticket']['ox_preset_image_id'] );
-		}
-
-		// Check in $_POST directly as last resort (AJAX might put it there).
+		// FALLBACK: Check in $_POST directly.
 		if ( ! $image_id && ! empty( $_POST['ox_preset_image_id'] ) ) {
 			$image_id = absint( $_POST['ox_preset_image_id'] );
 		}
 
-		// Debug logging (can be removed after testing).
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( 'OX Preset Images - raw_data keys: ' . implode( ', ', array_keys( $raw_data ) ) );
-			error_log( 'OX Preset Images - image_id found: ' . $image_id );
-		}
-
 		// If no image ID found, nothing to do.
 		if ( ! $image_id ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'OX Preset Images - no image_id found, skipping' );
+			}
 			return;
 		}
 
