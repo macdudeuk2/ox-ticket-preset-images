@@ -1,0 +1,125 @@
+/**
+ * Admin styles for OX Ticket Preset Images.
+ *
+ * @package OX_Ticket_Preset_Images
+ */
+
+/* ==========================================================================
+   Preset Form Image Field
+   ========================================================================== */
+
+.ox-preset-image-field {
+	margin-bottom: 20px;
+}
+
+.ox-preset-image-field .tec-tickets-plus-preset__field-wrapper {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.ox-preset-image-preview {
+	display: inline-block;
+	min-height: 50px;
+	background: #f0f0f1;
+	border: 1px dashed #c3c4c7;
+	border-radius: 4px;
+	padding: 5px;
+	max-width: 200px;
+}
+
+.ox-preset-image-preview:empty {
+	display: none;
+}
+
+.ox-preset-image-preview img {
+	display: block;
+	max-width: 150px;
+	height: auto;
+	border-radius: 3px;
+}
+
+.ox-preset-image-buttons {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.ox-preset-image-buttons .button {
+	margin: 0;
+}
+
+.ox-preset-image-field .description {
+	color: #646970;
+	font-style: italic;
+	margin-top: 5px;
+}
+
+/* ==========================================================================
+   Save as Preset Modal Image Field
+   ========================================================================== */
+
+.ox-preset-modal-image-field {
+	margin-top: 15px;
+	padding-top: 15px;
+	border-top: 1px solid #e0e0e0;
+}
+
+.ox-preset-modal-image-field .tec-tickets-plus-preset-modal__label {
+	display: block;
+	margin-bottom: 8px;
+	font-weight: 600;
+}
+
+.ox-preset-modal-image-field .ox-preset-image-preview {
+	margin-bottom: 10px;
+	background: #fafafa;
+	border: 1px dashed #ddd;
+	padding: 8px;
+	border-radius: 4px;
+	max-width: 150px;
+}
+
+.ox-preset-modal-image-field .ox-preset-image-preview:empty {
+	display: none;
+}
+
+.ox-preset-modal-image-field .ox-preset-image-preview img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	border-radius: 3px;
+}
+
+.ox-preset-modal-image-field .ox-preset-image-buttons {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	margin-bottom: 8px;
+}
+
+.ox-preset-modal-image-field .description {
+	color: #757575;
+	font-size: 12px;
+	font-style: italic;
+	margin: 0;
+}
+
+/* ==========================================================================
+   Responsive Adjustments
+   ========================================================================== */
+
+@media screen and (max-width: 782px) {
+	.ox-preset-image-buttons {
+		flex-direction: column;
+	}
+	
+	.ox-preset-image-buttons .button {
+		width: 100%;
+		text-align: center;
+	}
+	
+	.ox-preset-image-preview {
+		max-width: 100%;
+	}
+}
