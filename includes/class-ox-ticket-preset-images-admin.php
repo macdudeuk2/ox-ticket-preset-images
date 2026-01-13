@@ -41,8 +41,11 @@ class OX_Ticket_Preset_Images_Admin {
 		// Handle preset save - intercept before TEC's handler.
 		add_action( 'admin_post_tec_tickets_save_preset', [ $this, 'handle_preset_save' ], 5 );
 
+		// Process pending preset image after redirect from new preset creation.
+		add_action( 'admin_init', [ $this, 'process_pending_preset_image' ], 5 );
+
 		// Handle preset deletion - clean up our option.
-		add_action( 'admin_init', [ $this, 'handle_preset_delete_cleanup' ], 5 );
+		add_action( 'admin_init', [ $this, 'handle_preset_delete_cleanup' ], 6 );
 
 		// Add field to "Save as Preset" modal.
 		add_action( 'tec_tickets_plus_save_as_preset_modal_fields', [ $this, 'render_modal_image_field' ] );
@@ -271,6 +274,7 @@ class OX_Ticket_Preset_Images_Admin {
 	 * Handle preset save - save our image option.
 	 *
 	 * This runs at priority 5, before TEC's handler at priority 10.
+	 * TEC's handler redirects and exits, so we must handle everything here.
 	 */
 	public function handle_preset_save(): void {
 		// Verify nonce (TEC's nonce).
@@ -281,43 +285,53 @@ class OX_Ticket_Preset_Images_Admin {
 		// Get image ID from POST.
 		$image_id = isset( $_POST['ox_preset_featured_image'] ) ? absint( $_POST['ox_preset_featured_image'] ) : 0;
 
-		// Store in a transient for now - we'll save properly after TEC creates/updates the preset.
-		set_transient( 'ox_pending_preset_image', $image_id, 60 );
+		// Get preset ID if editing existing preset.
+		$preset_id = isset( $_POST['preset_id'] ) ? absint( $_POST['preset_id'] ) : 0;
 
-		// Hook into after TEC's save to get the preset ID.
-		add_action( 'admin_post_tec_tickets_save_preset', [ $this, 'save_preset_image_after_tec' ], 15 );
+		if ( $preset_id ) {
+			// Editing existing preset - save immediately.
+			OX_Ticket_Preset_Images::set_preset_image( $preset_id, $image_id );
+		} else {
+			// Creating new preset - store in user transient for processing after redirect.
+			// TEC will redirect after creating the preset, so we save pending data.
+			$user_id = get_current_user_id();
+			set_transient( "ox_pending_preset_image_{$user_id}", $image_id, 120 );
+		}
 	}
 
 	/**
-	 * Save the preset image after TEC has saved the preset.
+	 * Process pending preset image after redirect from new preset creation.
 	 *
-	 * This runs at priority 15, after TEC's handler.
+	 * Called on admin_init to check if we have a pending image to save.
 	 */
-	public function save_preset_image_after_tec(): void {
-		$image_id = get_transient( 'ox_pending_preset_image' );
-		delete_transient( 'ox_pending_preset_image' );
+	public function process_pending_preset_image(): void {
+		$user_id  = get_current_user_id();
+		$image_id = get_transient( "ox_pending_preset_image_{$user_id}" );
 
 		if ( false === $image_id ) {
 			return;
 		}
 
-		// Get the preset ID - either from POST (edit) or from the redirect URL (new).
-		$preset_id = isset( $_POST['preset_id'] ) ? absint( $_POST['preset_id'] ) : 0;
+		// Delete the transient immediately to prevent duplicate processing.
+		delete_transient( "ox_pending_preset_image_{$user_id}" );
 
-		if ( $preset_id ) {
-			OX_Ticket_Preset_Images::set_preset_image( $preset_id, (int) $image_id );
-		} else {
-			// For new presets, we need to get the ID from the database.
-			// The latest preset created should be ours.
-			global $wpdb;
-			$table_name = $wpdb->prefix . 'tec_ticket_groups';
-			
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$latest_id = $wpdb->get_var( "SELECT MAX(id) FROM {$table_name}" );
-			
-			if ( $latest_id ) {
-				OX_Ticket_Preset_Images::set_preset_image( (int) $latest_id, (int) $image_id );
-			}
+		// Only process if we're on the presets page (after redirect from save).
+		$page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+		$tab  = isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : '';
+
+		if ( 'tec-tickets-admin-tickets' !== $page || 'presets' !== $tab ) {
+			return;
+		}
+
+		// Get the most recently created preset (should be the one we just created).
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'tec_ticket_groups';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$latest_id = $wpdb->get_var( "SELECT MAX(id) FROM {$table_name}" );
+
+		if ( $latest_id && $image_id ) {
+			OX_Ticket_Preset_Images::set_preset_image( (int) $latest_id, (int) $image_id );
 		}
 	}
 
